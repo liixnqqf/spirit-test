@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>精神需求测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#8b78e6',
+                        secondary: '#a7c7e7',
+                        accent: '#f2b880',
+                        soft: {
+                            purple: '#f0edff',
+                            blue: '#e8f4f8',
+                            orange: '#fff4e6',
+                            green: '#e6f4ea',
+                            pink: '#ffeef2',
+                            gray: '#f8f9fa'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'sans-serif']
+                    },
+                    boxShadow: {
+                        'card': '0 8px 24px rgba(140, 152, 164, 0.12)',
+                        'hover': '0 12px 32px rgba(140, 152, 164, 0.18)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .bg-gradient-soft {
+                background: linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%);
+            }
+            .option-hover {
+                transition: all 0.3s ease;
+            }
+            .option-hover:hover {
+                transform: translateY(-2px);
+            }
+            .progress-shine {
+                background: linear-gradient(90deg, 
+                    rgba(255,255,255,0) 0%, 
+                    rgba(255,255,255,0.2) 50%, 
+                    rgba(255,255,255,0) 100%);
+                background-size: 200% 100%;
+                animation: shine 2s infinite;
+            }
+            @keyframes shine {
+                0% { background-position: -200% 0; }
+                100% { background-position: 200% 0; }
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-soft min-h-screen font-sans text-gray-700">
+    <!-- 顶部装饰 -->
+    <div class="h-2 bg-gradient-to-r from-primary via-secondary to-accent"></div>
+
+    <!-- 测试容器 -->
+    <div id="test-container" class="max-w-md mx-auto p-4 pt-6 pb-20">
+        <!-- 进度条 -->
+        <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-6">
+            <div id="progress-bar" class="h-full bg-gradient-to-r from-primary to-secondary progress-shine" style="width: 1.67%"></div>
+        </div>
+
+        <!-- 题目卡片 -->
+        <div id="question-card" class="bg-white rounded-2xl p-6 shadow-card transition-all duration-300 mb-6">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-lg font-semibold text-primary flex items-center">
+                    <i class="fa fa-lightbulb-o mr-2"></i>精神需求测试
+                </h2>
+                <span id="question-count" class="text-sm bg-soft-purple text-primary px-3 py-1 rounded-full">1/60</span>
+            </div>
+            <div id="question-text" class="text-base mb-6 leading-relaxed"></div>
+            <div id="options-container" class="space-y-3"></div>
+            <div id="error-tip" class="text-red-500 text-sm mt-3 hidden flex items-center">
+                <i class="fa fa-exclamation-circle mr-1"></i>请选择一个答案
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="flex justify-start">
+            <button id="prev-btn" class="bg-soft-purple text-primary px-4 py-2 rounded-lg shadow-sm hover:bg-primary hover:text-white transition-all duration-300 flex items-center opacity-50 cursor-not-allowed" disabled>
+                <i class="fa fa-arrow-left mr-2"></i>上一题
+            </button>
+        </div>
+    </div>
+
+    <!-- 结果容器（默认隐藏） -->
+    <div id="result-container" class="max-w-md mx-auto p-4 pt-6 pb-20 hidden">
+        <!-- 结果卡片 -->
+        <div class="bg-white rounded-2xl p-6 shadow-card mb-6">
+            <h2 class="text-lg font-semibold text-primary flex items-center mb-6">
+                <i class="fa fa-bar-chart mr-2"></i>你的精神需求测试结果
+            </h2>
+            
+            <!-- 图表容器 -->
+            <div class="h-[360px] mb-8">
+                <canvas id="result-chart"></canvas>
+            </div>
+            
+            <!-- 解读区域 -->
+            <div class="space-y-5">
+                <h3 class="text-base font-medium text-gray-600 border-b border-gray-100 pb-2">各维度解读</h3>
+                <div id="interpretation-container" class="space-y-4 max-h-[400px] overflow-y-auto pr-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 题目数据（50道是非题 + 10道情景题）
+        const questions = [
+            // 是非题（1-50）
+            { type: 'yesno', text: '你常思考“生活的意义是什么”？' },
+            { type: 'yesno', text: '你渴望与他人建立深度情感连接？' },
+            { type: 'yesno', text: '你享受帮助他人后的满足感？' },
+            { type: 'yesno', text: '你在意自己是否能掌控周围环境？' },
+            { type: 'yesno', text: '你喜欢尝试新事物来提升自己？' },
+            { type: 'yesno', text: '你需要频繁的情感表达来确认被爱？' },
+            { type: 'yesno', text: '你觉得“开心就好”是重要的生活准则？' },
+            { type: 'yesno', text: '你在陌生环境中会感到不安？' },
+            { type: 'yesno', text: '你喜欢自由安排自己的时间？' },
+            { type: 'yesno', text: '你享受创作（如写作、绘画）的过程？' },
+            { type: 'yesno', text: '你认为“做有价值的事”比“赚钱”重要？' },
+            { type: 'yesno', text: '你会主动维系与亲友的关系？' },
+            { type: 'yesno', text: '你愿意为集体利益牺牲个人时间？' },
+            { type: 'yesno', text: '你希望在团队中扮演主导角色？' },
+            { type: 'yesno', text: '你会定期学习新技能？' },
+            { type: 'yesno', text: '你会向他人坦诚自己的脆弱？' },
+            { type: 'yesno', text: '你喜欢轻松的娱乐活动（如追剧、游戏）？' },
+            { type: 'yesno', text: '你需要明确的规则来获得安全感？' },
+            { type: 'yesno', text: '你讨厌被他人安排行程？' },
+            { type: 'yesno', text: '你常产生新奇的想法并想实践？' },
+            { type: 'yesno', text: '你会因“做了无意义的事”而内疚？' },
+            { type: 'yesno', text: '你在意他人是否真正理解你？' },
+            { type: 'yesno', text: '你会主动帮助遇到困难的陌生人？' },
+            { type: 'yesno', text: '你希望自己的意见被他人重视？' },
+            { type: 'yesno', text: '你享受“突破自我”的成就感？' },
+            { type: 'yesno', text: '你会频繁向爱人表达爱意？' },
+            { type: 'yesno', text: '你觉得“有趣”是交友的重要标准？' },
+            { type: 'yesno', text: '你会提前规划避免意外？' },
+            { type: 'yesno', text: '你喜欢不受约束的生活方式？' },
+            { type: 'yesno', text: '你会用创意方式解决问题？' },
+            { type: 'yesno', text: '你认为“找到人生目标”是必须的？' },
+            { type: 'yesno', text: '你需要朋友的陪伴来缓解孤独？' },
+            { type: 'yesno', text: '你觉得“贡献社会”是责任？' },
+            { type: 'yesno', text: '你会争取自己的“话语权”？' },
+            { type: 'yesno', text: '你在意自己的“成长速度”？' },
+            { type: 'yesno', text: '你会因“被忽视”而感到受伤？' },
+            { type: 'yesno', text: '你喜欢和幽默的人相处？' },
+            { type: 'yesno', text: '你会因“不确定的事”而焦虑？' },
+            { type: 'yesno', text: '你讨厌被他人评判？' },
+            { type: 'yesno', text: '你会尝试用不同方式表达自己？' },
+            { type: 'yesno', text: '你常反思自己的行为是否“有意义”？' },
+            { type: 'yesno', text: '你会主动与他人分享生活琐事？' },
+            { type: 'yesno', text: '你会参与公益活动？' },
+            { type: 'yesno', text: '你希望自己有“影响力”？' },
+            { type: 'yesno', text: '你会为了“变更好”而跳出舒适区？' },
+            { type: 'yesno', text: '你需要爱人的“专属陪伴”？' },
+            { type: 'yesno', text: '你会花时间做“没意义但开心”的事？' },
+            { type: 'yesno', text: '你喜欢“稳定”胜过“变化”？' },
+            { type: 'yesno', text: '你会拒绝让自己不自在的请求？' },
+            { type: 'yesno', text: '你会记录自己的创意灵感？' },
+
+            // 情景题（51-60）
+            { 
+                type: 'scene', 
+                text: '初识新朋友时，你更在意：', 
+                options: [
+                    '对方是否和你有精神共鸣',
+                    '对方是否友善好相处',
+                    '对方是否需要你的帮助',
+                    '对方是否尊重你的想法'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '周末空闲时，你更愿意：', 
+                options: [
+                    '做一件“有意义”的事（如看书）',
+                    '和亲友聚会',
+                    '尝试新的兴趣爱好',
+                    '宅家放松娱乐'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '遇到挫折时，你最需要：', 
+                options: [
+                    '他人的情感支持',
+                    '明确的解决方案',
+                    '独处空间自我调整',
+                    '做一件开心的事转移注意力'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '选择工作时，你更看重：', 
+                options: [
+                    '工作的意义与价值',
+                    '团队氛围是否融洽',
+                    '能否获得成长',
+                    '是否有自主空间'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '和爱人相处时，你更在意：', 
+                options: [
+                    '情感的深度连接',
+                    '相处时的轻松愉悦',
+                    '彼此能否共同成长',
+                    '是否尊重对方的边界'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '当意见被否定时，你会：', 
+                options: [
+                    '解释自己的想法逻辑',
+                    '在意对方是否否定“你这个人”',
+                    '反思自己是否有不足',
+                    '觉得不被尊重而生气'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '你更喜欢的社交方式是：', 
+                options: [
+                    '深度的一对一聊天',
+                    '轻松的多人聚会',
+                    '有共同目标的团队活动',
+                    '自由的兴趣小组'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '你对“完美生活”的定义更接近：', 
+                options: [
+                    '有明确的意义与目标',
+                    '被爱与被陪伴',
+                    '持续成长与进步',
+                    '自由且快乐'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '当朋友求助时，你会：', 
+                options: [
+                    '尽力帮忙并感到开心',
+                    '先确认自己是否有时间',
+                    '提供解决问题的思路',
+                    '陪伴对方缓解情绪'
+                ]
+            },
+            { 
+                type: 'scene', 
+                text: '你会因什么而感到“充实”：', 
+                options: [
+                    '完成了有价值的事',
+                    '和重要的人共度时光',
+                    '学到了新的东西',
+                    '做了自己想做的事'
+                ]
+            }
+        ];
+
+        // 精神维度配置
+        const dimensions = [
+            { id: '意义感', icon: 'fa-compass', color: '#8b78e6', desc: '对生活目标和价值的追求程度' },
+            { id: '情感连接', icon: 'fa-heart', color: '#e86ed0', desc: '对亲密关系和情感支持的需求' },
+            { id: '社会归属', icon: 'fa-users', color: '#6ea3ff', desc: '融入群体和被接纳的需求' },
+            { id: '个人成长', icon: 'fa-rocket', color: '#4dd0e1', desc: '自我提升和突破的动力' },
+            { id: '创造力', icon: 'fa-paint-brush', color: '#ffb74d', desc: '表达和创造新事物的欲望' },
+            { id: '掌控感', icon: 'fa-sliders', color: '#8d6e63', desc: '对环境和自身的控制需求' },
+            { id: '愉悦体验', icon: 'fa-smile-o', color: '#aed581', desc: '追求快乐和享受的程度' },
+            { id: '安全感', icon: 'fa-shield', color: '#90caf9', desc: '对稳定和安全环境的需求' },
+            { id: '自主性', icon: 'fa-leaf', color: '#66bb6a', desc: '追求自由和独立的程度' },
+            { id: '贡献欲', icon: 'fa-hand-paper-o', color: '#f48fb1', desc: '帮助他人和奉献的意愿' }
+        ];
+
+        // 全局变量
+        let currentQuestionIndex = 0;
+        let answers = [];
+        let dimensionScores = new Array(dimensions.length).fill(0);
+
+        // DOM元素
+        const questionCard = document.getElementById('question-card');
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const questionCount = document.getElementById('question-count');
+        const errorTip = document.getElementById('error-tip');
+        const progressBar = document.getElementById('progress-bar');
+        const prevBtn = document.getElementById('prev-btn');
+        const testContainer = document.getElementById('test-container');
+        const resultContainer = document.getElementById('result-container');
+
+        // 初始化题目
+        function initQuestion() {
+            const question = questions[currentQuestionIndex];
+            questionText.textContent = question.text;
+            questionCount.textContent = `${currentQuestionIndex + 1}/${questions.length}`;
+            progressBar.style.width = `${((currentQuestionIndex + 1) / questions.length) * 100}%`;
+            optionsContainer.innerHTML = '';
+
+            // 更新上一题按钮状态
+            if (currentQuestionIndex === 0) {
+                prevBtn.disabled = true;
+                prevBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                prevBtn.classList.remove('hover:bg-primary', 'hover:text-white');
+            } else {
+                prevBtn.disabled = false;
+                prevBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                prevBtn.classList.add('hover:bg-primary', 'hover:text-white');
+            }
+
+            // 生成选项
+            if (question.type === 'yesno') {
+                const options = [
+                    { text: '是', bg: 'bg-soft-purple', color: 'text-primary' },
+                    { text: '否', bg: 'bg-soft-gray', color: 'text-gray-600' }
+                ];
+                
+                options.forEach(option => {
+                    const btn = document.createElement('button');
+                    btn.className = `w-full py-3 rounded-xl ${option.bg} ${option.color} text-left pl-5 shadow-sm option-hover`;
+                    btn.textContent = option.text;
+                    btn.onclick = () => selectAnswer(option.text === '是' ? 1 : 0);
+                    optionsContainer.appendChild(btn);
+                });
+            } else if (question.type === 'scene') {
+                const bgColors = ['bg-soft-purple', 'bg-soft-blue', 'bg-soft-orange', 'bg-soft-green'];
+                const textColors = ['text-primary', 'text-blue-600', 'text-orange-600', 'text-green-600'];
+                
+                question.options.forEach((option, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = `w-full py-3 rounded-xl ${bgColors[idx % 4]} ${textColors[idx % 4]} text-left pl-5 shadow-sm option-hover`;
+                    btn.innerHTML = `<span class="inline-block w-6 h-6 rounded-full bg-white/50 text-xs text-center leading-6 mr-2">${idx + 1}</span>${option}`;
+                    btn.onclick = () => selectAnswer(idx + 1);
+                    optionsContainer.appendChild(btn);
+                });
+            }
+
+            // 添加题目切换动画
+            questionCard.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => {
+                questionCard.classList.remove('opacity-0', 'translate-y-2');
+            }, 50);
+        }
+
+        // 选择答案
+        function selectAnswer(score) {
+            answers[currentQuestionIndex] = score;
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex < questions.length) {
+                initQuestion();
+            } else {
+                calculateResult();
+                showResult();
+            }
+        }
+
+        // 上一题
+        function goToPrevQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                initQuestion();
+            }
+        }
+
+        // 计算结果
+        function calculateResult() {
+            // 各维度题目映射（1-based索引）
+            const dimensionQuestionMap = [
+                [1, 11, 21, 31, 41, 51, 54, 58], // 意义感
+                [2, 6, 16, 26, 36, 46, 55, 59], // 情感连接
+                [12, 22, 32, 42, 51, 57], // 社会归属
+                [5, 15, 25, 35, 45, 54, 58], // 个人成长
+                [10, 20, 30, 40, 50, 56], // 创造力
+                [4, 14, 24, 34, 44, 51, 56], // 掌控感
+                [7, 17, 27, 37, 47, 52, 53], // 愉悦体验
+                [8, 18, 28, 38, 48, 53], // 安全感
+                [9, 19, 29, 39, 49, 54, 57], // 自主性
+                [3, 13, 23, 33, 43, 57, 59]  // 贡献欲
+            ];
+
+            // 统计得分
+            dimensions.forEach((dim, dimIdx) => {
+                const relatedQuestions = dimensionQuestionMap[dimIdx];
+                let total = 0;
+                
+                relatedQuestions.forEach(qIdx => {
+                    total += answers[qIdx - 1] || 0;
+                });
+                
+                // 归一化到0-100
+                dimensionScores[dimIdx] = Math.min(Math.round((total / relatedQuestions.length) * 100), 100);
+            });
+        }
+
+        // 展示结果
+        function showResult() {
+            testContainer.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+
+            // 生成图表
+            const ctx = document.getElementById('result-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dimensions.map(d => `<i class="fa ${d.icon}"></i> ${d.id}`),
+                    datasets: [{
+                        label: '需求程度',
+                        data: dimensionScores,
+                        backgroundColor: dimensions.map(d => d.color),
+                        borderRadius: 8,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            max: 100,
+                            grid: {
+                                display: true,
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: { 
+                                callback: v => `${v}%`,
+                                color: '#888'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: { 
+                                color: '#555',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            titleColor: '#333',
+                            bodyColor: '#666',
+                            borderColor: 'rgba(0,0,0,0.1)',
+                            borderWidth: 1,
+                            padding: 10,
+                            boxPadding: 5,
+                            callbacks: {
+                                label: (ctx) => `${ctx.raw}%`,
+                                title: (ctx) => {
+                                    const idx = ctx[0].dataIndex;
+                                    return `${dimensions[idx].id} - ${dimensions[idx].desc}`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+
+            // 生成解读
+            const interpretationContainer = document.getElementById('interpretation-container');
+            dimensions.forEach((dim, idx) => {
+                const score = dimensionScores[idx];
+                let levelText, levelClass;
+                
+                if (score > 70) {
+                    levelText = "高需求";
+                    levelClass = "bg-soft-purple text-primary";
+                } else if (score > 40) {
+                    levelText = "中等需求";
+                    levelClass = "bg-soft-blue text-blue-600";
+                } else {
+                    levelText = "低需求";
+                    levelClass = "bg-soft-gray text-gray-600";
+                }
+
+                const item = document.createElement('div');
+                item.className = 'p-4 bg-gray-50 rounded-xl shadow-sm hover:shadow transition-shadow';
+                item.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-medium flex items-center">
+                            <i class="fa ${dim.icon} mr-2 text-lg" style="color: ${dim.color}"></i>
+                            ${dim.id}
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded-full ${levelClass}">${levelText}</span>
+                    </div>
+                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
+                        <div class="h-full rounded-full" style="width: ${score}%; background-color: ${dim.color}"></div>
+                    </div>
+                    <div class="text-sm text-gray-600">${dim.desc}，你的需求程度为${score}%。</div>
+                `;
+                interpretationContainer.appendChild(item);
+            });
+        }
+
+        // 事件监听
+        prevBtn.addEventListener('click', goToPrevQuestion);
+
+        // 初始化
+        initQuestion();
+    </script>
+</body>
+</html></title>
+</head>
+<body>
+
+</body>
+</html>
